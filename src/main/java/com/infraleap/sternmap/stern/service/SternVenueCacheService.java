@@ -138,8 +138,7 @@ public class SternVenueCacheService {
                 .build();
         this.pbmClient = WebClient.builder()
                 .codecs(c -> c.defaultCodecs().maxInMemorySize(64 * 1024 * 1024))
-                .defaultHeader("User-Agent",
-                        "sternmap-hackathon/1.0 (https://github.com/vaadin; enver@vaadin.com)")
+                .defaultHeader("User-Agent", "sternmap/1.0")
                 .defaultHeader("Accept", "application/json")
                 .build();
     }

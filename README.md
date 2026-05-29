@@ -1,4 +1,4 @@
-# Hackathon 25.2 — Stern Pinball Map
+# Stern Pinball Map
 
 A Vaadin Platform 25.2 application that plots every **Stern Insider Connected**
 venue near you on a map, with the machines on location and the active
@@ -112,7 +112,7 @@ real venue listing.
 - `/portal/leaderboards/titles/?location=<id>`,
   `/portal/leaderboards/machines/?location=<id>` — 404 on this base.
 - `/portal/user_game_locations/?group_type=home` — works but returns only the
-  user's own home machines ("ENVER's Gameroom"), not a public venue listing.
+  authenticated user's own home-group machines, not a public venue listing.
 
 ## Auth: dynamic Next-Action discovery
 
@@ -183,13 +183,9 @@ Pinball Map disabled (set pinballmap.enabled=true to augment with the community 
 
 ## Version note
 
-Hackathon rules call for Platform `25.2.0-beta1`. As of 2026-05-29 the
+We pin Vaadin Platform `25.2.0-beta1`. As of 2026-05-29 the
 `vaadin-prereleases` `maven-metadata.xml` lists `25.2.0-alpha8` as `<release>`;
 beta1 has not yet shipped. `pom.xml` pins `alpha8`; bump once beta1 publishes.
 
-## Hackathon meta
-
-- Slack: `#hackathon-25-2`
-- Branch: `enver-hackathon`
-- Map component is commercial; uses the developer license already on
-  `enver@vaadin.com`'s machine.
+The Map component is commercial and requires a Vaadin developer license to
+build and run.

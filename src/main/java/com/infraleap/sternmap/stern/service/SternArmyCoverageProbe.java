@@ -45,8 +45,7 @@ public class SternArmyCoverageProbe implements CommandLineRunner {
         this.enabled = enabled;
         this.http = WebClient.builder()
                 .codecs(c -> c.defaultCodecs().maxInMemorySize(8 * 1024 * 1024))
-                .defaultHeader("User-Agent",
-                        "sternmap-debug/1.0 (https://github.com/vaadin; enver@vaadin.com)")
+                .defaultHeader("User-Agent", "sternmap-debug/1.0")
                 .build();
     }
 
