@@ -5,12 +5,7 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Unified view-model for a venue rendered on the map. A venue can belong to
- * multiple sources at once — e.g. COSMOSArcade Hamburger Meile is both a Stern
- * IC venue (8 networked machines in Stern's v2 catalogue) and a Stern Army
- * venue (Pinball Map's {@code is_stern_army=true} flag, also displayed on
- * sternpinball.com's marketing locator). The {@link #sources} set captures
- * both.
+ * Unified view-model for a venue rendered on the map.
  */
 public record VenueOnMap(
         long id,
@@ -20,27 +15,42 @@ public record VenueOnMap(
         double lon,
         String websiteUrl,
         String type,
-        List<String> machineNames,
+        List<Machine> machines,
         Set<Source> sources
 ) {
     public enum Source { STERN_IC, STERN_ARMY }
 
+    /**
+     * One pinball machine at a venue. {@code displayName} is always populated.
+     * {@code sternMachineId} is set when the machine record came from Stern's
+     * native v2 catalogue and can therefore be used to fetch top-5 high scores
+     * via {@code /api/v1/portal/game_machine_high_scores/?machine_id=<id>}.
+     * For Pinball-Map-sourced Stern Army venues we only know the model name,
+     * so {@code sternMachineId} is null and high-score lookup isn't possible.
+     */
+    public record Machine(String displayName, Long sternMachineId) {
+        public boolean hasSternId() { return sternMachineId != null; }
+    }
+
     public VenueOnMap {
-        // Defensive copy + ensure non-null/immutable
         sources = sources == null ? EnumSet.noneOf(Source.class) : EnumSet.copyOf(sources);
-        machineNames = machineNames == null ? List.of() : List.copyOf(machineNames);
+        machines = machines == null ? List.of() : List.copyOf(machines);
     }
 
     public boolean isSternIc() { return sources.contains(Source.STERN_IC); }
     public boolean isSternArmy() { return sources.contains(Source.STERN_ARMY); }
 
-    public int machineCount() { return machineNames.size(); }
+    public int machineCount() { return machines.size(); }
 
-    /** Return a new VenueOnMap with the given source added to the sources set. */
     public VenueOnMap withSource(Source extra) {
         if (sources.contains(extra)) return this;
         EnumSet<Source> ns = EnumSet.copyOf(sources);
         ns.add(extra);
-        return new VenueOnMap(id, name, address, lat, lon, websiteUrl, type, machineNames, ns);
+        return new VenueOnMap(id, name, address, lat, lon, websiteUrl, type, machines, ns);
+    }
+
+    public VenueOnMap withAddress(String newAddress) {
+        if (java.util.Objects.equals(address, newAddress)) return this;
+        return new VenueOnMap(id, name, newAddress, lat, lon, websiteUrl, type, machines, sources);
     }
 }

@@ -1,6 +1,7 @@
 package com.infraleap.sternmap.ui.view;
 
 import com.infraleap.sternmap.stern.domain.VenueOnMap;
+import com.infraleap.sternmap.stern.service.MachineHighScoreService;
 import com.infraleap.sternmap.stern.service.SternVenueCacheService;
 import com.infraleap.sternmap.ui.MapExtentFilter;
 import com.infraleap.sternmap.ui.MapIcons;
@@ -39,6 +40,7 @@ public class MapView extends HorizontalLayout {
     private static final int INITIAL_SIDEBAR_LIMIT = 25;
 
     private final SternVenueCacheService cache;
+    private final MachineHighScoreService highScoreService;
 
     private final Map map = new Map();
     private final VerticalLayout sidebar = new VerticalLayout();
@@ -54,8 +56,9 @@ public class MapView extends HorizontalLayout {
     private List<VenueOnMap> allVenues = List.of();
     private double userLat, userLon;
 
-    public MapView(SternVenueCacheService cache) {
+    public MapView(SternVenueCacheService cache, MachineHighScoreService highScoreService) {
         this.cache = cache;
+        this.highScoreService = highScoreService;
 
         setSizeFull();
         setPadding(false);
@@ -132,7 +135,69 @@ public class MapView extends HorizontalLayout {
                         + "  );"
                         + "})")
                 .then(String.class, this::onLocation);
+
+        // Install zoom-aware icon scaling on the client. OpenLayers (the engine
+        // underneath Vaadin Map) keeps icons at constant pixel size regardless
+        // of zoom, so markers appear to shrink as the map zooms in. We wrap
+        // each feature's style function with one that re-sets the icon's
+        // scale based on the current view zoom, and trigger a redraw on every
+        // resolution change. The wrapping is idempotent (guarded by a flag
+        // on the feature) and an `addfeature` listener picks up markers added
+        // later (e.g. when the venue cache finishes loading).
+        attachEvent.getUI().getPage().executeJs(ZOOM_SCALE_JS);
     }
+
+    private static final String ZOOM_SCALE_JS =
+            "(() => {"
+            + "  function tryInstall() {"
+            + "    const mapEl = document.querySelector('vaadin-map');"
+            + "    if (!mapEl || !mapEl._configuration) { setTimeout(tryInstall, 200); return; }"
+            + "    const olMap = mapEl._configuration;"
+            + "    const view = olMap.getView();"
+            + "    const layer = olMap.getLayers().item(1);"  // background=0, features=1
+            + "    if (!layer) { setTimeout(tryInstall, 200); return; }"
+            + "    const src = layer.getSource();"
+            + "    function factorFromZoom(z) {"
+            // Linear ramp: zoom 3 → 0.10, zoom 16 → 0.35 (capped). Step ≈ 0.019/zoom.
+            + "      return Math.max(0.10, Math.min(0.35, 0.10 + (z - 3) * 0.019));"
+            + "    }"
+            + "    function wrap(f) {"
+            + "      if (f._sternWrapped) return;"
+            + "      const orig = f.getStyle();"
+            + "      if (typeof orig !== 'function') return;"
+            + "      f.setStyle(function(feature, resolution) {"
+            + "        const result = orig.call(this, feature, resolution);"
+            + "        const zoom = view.getZoom();"
+            + "        const factor = factorFromZoom(zoom);"
+            // Hide marker text at world (0-3) and country (4-6) zoom levels —
+            // labels would clutter a continent view of thousands of venues.
+            + "        const showText = zoom >= 7;"
+            + "        const arr = Array.isArray(result) ? result : (result ? [result] : []);"
+            + "        for (const s of arr) {"
+            + "          const img = s.getImage && s.getImage();"
+            + "          if (img && img.setScale) img.setScale(factor);"
+            + "          if (!showText) {"
+            + "            const t = s.getText && s.getText();"
+            + "            if (t && t.setText) t.setText('');"
+            + "          }"
+            + "        }"
+            + "        return result;"
+            + "      });"
+            + "      f._sternWrapped = true;"
+            + "    }"
+            + "    src.getFeatures().forEach(wrap);"
+            + "    if (!src._sternFeatListener) {"
+            + "      src.on('addfeature', e => wrap(e.feature));"
+            + "      src._sternFeatListener = true;"
+            + "    }"
+            + "    if (!view._sternZoomListener) {"
+            + "      view.on('change:resolution', () => src.changed());"
+            + "      view._sternZoomListener = true;"
+            + "    }"
+            + "    src.changed();"
+            + "  }"
+            + "  tryInstall();"
+            + "})();";
 
     private void onLocation(String result) {
         if (result == null || result.isBlank()) {
@@ -178,9 +243,14 @@ public class MapView extends HorizontalLayout {
                 + "Pan/zoom to filter.");
 
         for (VenueOnMap v : allVenues) {
-            // Stern Army takes visual precedence when a venue is both — the gold
-            // marker is rarer and more eye-catching, so it stands out on the map.
-            var icon = v.isSternArmy() ? MapIcons.sternArmyMarker() : MapIcons.sternIcMarker();
+            // Three marker variants:
+            //   IC only     → black silhouette
+            //   Army only   → Uncle Sam hat
+            //   Both (crossover) → hat with silhouette overlaid on the crown
+            com.vaadin.flow.component.map.configuration.style.Icon icon;
+            if (v.isSternIc() && v.isSternArmy()) icon = MapIcons.crossoverMarker();
+            else if (v.isSternArmy())             icon = MapIcons.sternArmyMarker();
+            else                                  icon = MapIcons.sternIcMarker();
             MarkerFeature marker = new MarkerFeature(new Coordinate(v.lon(), v.lat()), icon);
             marker.setText(v.name());
             map.getFeatureLayer().addFeature(marker);
@@ -321,11 +391,13 @@ public class MapView extends HorizontalLayout {
             card.add(addr);
         }
 
-        if (v.machineNames() != null && !v.machineNames().isEmpty()) {
+        if (v.machines() != null && !v.machines().isEmpty()) {
             UnorderedList machines = new UnorderedList();
             machines.getStyle().set("margin", "0.25rem 0 0 1rem").set("padding", "0")
                     .set("font-size", "0.8rem");
-            for (String m : v.machineNames()) machines.add(new ListItem(m));
+            for (VenueOnMap.Machine m : v.machines()) {
+                machines.add(buildMachineItem(m));
+            }
             card.add(machines);
         }
 
@@ -344,6 +416,88 @@ public class MapView extends HorizontalLayout {
         });
 
         return card;
+    }
+
+    /**
+     * Render one machine line. The default list bullet is replaced with a
+     * disclosure arrow: ▶ when collapsed, ▼ when expanded. Stern IC machines
+     * are clickable to lazy-load + toggle the perpetual top-5 high scores
+     * (via {@link MachineHighScoreService}). Stern-Army-only entries (no Stern
+     * machine id, no score lookup possible) render with a neutral middle dot
+     * and aren't clickable.
+     */
+    private Component buildMachineItem(VenueOnMap.Machine m) {
+        ListItem item = new ListItem();
+        item.getStyle().set("list-style", "none");
+
+        Span marker = new Span();
+        marker.getStyle()
+                .set("display", "inline-block")
+                .set("width", "1.1em")
+                .set("text-align", "center")
+                .set("color", "var(--vaadin-text-color-secondary, #888)");
+        Span name = new Span(m.displayName());
+
+        if (!m.hasSternId()) {
+            marker.setText("·");
+            item.add(marker, name);
+            return item;
+        }
+
+        marker.setText("▶");
+        item.add(marker, name);
+
+        Div scoresContainer = new Div();
+        scoresContainer.getStyle()
+                .set("margin", "0.15rem 0 0.4rem 1.1em")
+                .set("display", "none");
+        item.add(scoresContainer);
+
+        boolean[] loaded = {false};
+        item.getStyle().set("cursor", "pointer");
+        item.getElement().addEventListener("click", e -> {
+            boolean expanded = "▼".equals(marker.getText());
+            if (expanded) {
+                marker.setText("▶");
+                scoresContainer.getStyle().set("display", "none");
+            } else {
+                if (!loaded[0]) {
+                    renderTopScores(scoresContainer, highScoreService.topScores(m.sternMachineId()));
+                    loaded[0] = true;
+                }
+                marker.setText("▼");
+                scoresContainer.getStyle().set("display", "block");
+            }
+        }).stopPropagation();
+
+        return item;
+    }
+
+    private void renderTopScores(Div container,
+                                 List<com.infraleap.sternmap.stern.domain.MachineHighScoreResponse.Entry> entries) {
+        container.removeAll();
+        if (entries.isEmpty()) {
+            Span empty = new Span("No scores returned (anonymous lookup?).");
+            empty.getStyle().set("color", "var(--vaadin-text-color-secondary, #888)")
+                    .set("font-style", "italic").set("font-size", "0.75rem");
+            container.add(empty);
+            return;
+        }
+        com.vaadin.flow.component.orderedlayout.VerticalLayout list = new com.vaadin.flow.component.orderedlayout.VerticalLayout();
+        list.setPadding(false);
+        list.setSpacing(false);
+        list.getStyle().set("gap", "0.1rem").set("font-size", "0.75rem");
+        for (int i = 0; i < entries.size(); i++) {
+            var e = entries.get(i);
+            // Stern's leaderboard convention: slot 0 is the Grand Champion (GC),
+            // the remaining four are #1..#4.
+            String label = i == 0 ? "GC" : "#" + i;
+            Span row = new Span(label + "  " + e.displayName() + "  " + e.scoreFormatted());
+            row.getStyle().set("font-family", "var(--lumo-font-family-monospace, monospace)");
+            if (i == 0) row.getStyle().set("font-weight", "600");
+            list.add(row);
+        }
+        container.add(list);
     }
 
     private void selectCard(Component card) {

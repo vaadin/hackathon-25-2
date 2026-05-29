@@ -308,8 +308,6 @@ public class SternVenueCacheService {
         if (regions.isEmpty()) return List.of();
         log.info("Pinball Map: sweeping {} regions for is_stern_army=true in parallel batches of {}",
                 regions.size(), MAX_PARALLEL_PBM);
-        // Dedupe by venue id across regions (same venue can appear in multiple regions
-        // when regions overlap).
         java.util.Map<Long, PinballMapVenue> dedup = new HashMap<>();
         for (int i = 0; i < regions.size(); i += MAX_PARALLEL_PBM) {
             int hi = Math.min(i + MAX_PARALLEL_PBM, regions.size());
@@ -492,19 +490,25 @@ public class SternVenueCacheService {
     }
 
     private VenueOnMap toVenue(SternVenueV2 v) {
-        List<String> machineNames = v.machines() == null ? List.of()
-                : v.machines().stream().map(SternMachineV2::displayName).toList();
+        List<VenueOnMap.Machine> machines = v.machines() == null ? List.of()
+                : v.machines().stream()
+                .map(m -> new VenueOnMap.Machine(m.displayName(), m.id()))
+                .toList();
         return new VenueOnMap(
                 v.id(), v.name(), v.fullAddress(), v.lat(), v.lon(),
-                v.websiteUrl(), v.locationTypeName(), machineNames,
+                v.websiteUrl(), v.locationTypeName(), machines,
                 EnumSet.of(VenueOnMap.Source.STERN_IC));
     }
 
     private VenueOnMap toVenue(PinballMapVenue v) {
+        List<VenueOnMap.Machine> machines = v.machineNames() == null ? List.of()
+                : v.machineNames().stream()
+                .map(name -> new VenueOnMap.Machine(name, null))
+                .toList();
         return new VenueOnMap(
                 v.id(), v.name(), v.fullAddress(), v.latAsDouble(), v.lonAsDouble(),
                 v.website(), null,
-                v.machineNames() == null ? List.of() : v.machineNames(),
+                machines,
                 EnumSet.of(VenueOnMap.Source.STERN_ARMY));
     }
 }

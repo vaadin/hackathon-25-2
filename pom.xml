@@ -12,10 +12,9 @@
 
     <properties>
         <java.version>21</java.version>
-        <!-- Hackathon rules call for 25.2.0-beta1, but vaadin-prereleases'
-             maven-metadata.xml on 2026-05-29 still lists alpha8 as <release>.
-             Bump once beta1 publishes. -->
-        <vaadin.version>25.2.0-alpha8</vaadin.version>
+        <!-- 25.2.0-beta1 was published to Maven Central on 2026-05-28 (the
+             vaadin-prereleases repo doesn't list it yet, but central resolves). -->
+        <vaadin.version>25.2.0-beta1</vaadin.version>
     </properties>
 
     <parent>

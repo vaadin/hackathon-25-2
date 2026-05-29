@@ -1,6 +1,9 @@
 target/
 .claude/
 .playwright-mcp/
+# Playwright screenshots sometimes land at the project root
+map-zoom-*.png
+ic-locations.png
 node_modules/
 package-lock.json
 package.json

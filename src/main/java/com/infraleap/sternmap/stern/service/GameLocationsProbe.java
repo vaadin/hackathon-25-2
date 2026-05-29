@@ -60,11 +60,26 @@ public class GameLocationsProbe implements CommandLineRunner {
         }
         log.info("=== game_locations authed probe (lat=52.505, lon=13.3805) ===");
 
-        // Find Kickerkult Showroom across paginated v2 list.
-        List<String> paths = new java.util.ArrayList<>();
-        for (int off = 0; off < 4700; off += 500) {
-            paths.add(CMS_BASE + "/api/v2/portal/game_locations_with_games/?limit=500&offset=" + off);
-        }
+        // Hunt for the per-venue leaderboard endpoint. The IC SPA bundle calls
+        // /portal/leaderboards/titles/ with just `location`. We've tried pk=33885
+        // (400). Try the venue's other identifiers + alternative endpoints.
+        String pk = "33885";        // Gamestate Potsdamer Platz Berlin (Stern v2 id)
+        String code = "11627";      // Stern's customer code for Gamestate
+        String uid = "58cb78e5-1088-419a-b663-87450ac93b6b";  // Stern lb_location UUID
+        List<String> paths = List.of(
+                CMS_BASE + "/api/v1/portal/leaderboards/titles/?location=" + pk,
+                CMS_BASE + "/api/v1/portal/leaderboards/titles/?location=" + code,
+                CMS_BASE + "/api/v1/portal/leaderboards/titles/?location=" + uid,
+                CMS_BASE + "/api/v2/portal/leaderboards/titles/?location=" + pk,
+                CMS_BASE + "/api/v2/portal/leaderboards/titles/?location=" + uid,
+                CMS_BASE + "/api/v1/portal/leaderboards/titles/?lb_location=" + pk,
+                CMS_BASE + "/api/v1/portal/leaderboards/titles/?game_location=" + pk,
+                CMS_BASE + "/api/v1/portal/leaderboards/?game_location=" + pk,
+                CMS_BASE + "/api/v1/portal/leaderboards/?lb_location=" + pk,
+                CMS_BASE + "/api/v1/portal/game_locations/" + pk + "/leaderboards/",
+                CMS_BASE + "/api/v2/portal/game_locations/" + pk + "/leaderboards/",
+                CMS_BASE + "/api/v2/portal/game_locations_with_games/" + pk + "/leaderboards/"
+        );
 
         String cookies = authService.getCookies();
         int idx = 0;

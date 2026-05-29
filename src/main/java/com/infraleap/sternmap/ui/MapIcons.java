@@ -9,15 +9,14 @@ import java.util.Base64;
  * SVG marker icons baked as inline {@code data:} URLs.
  * <ul>
  *   <li>{@link #youMarker()} — map-pin with person silhouette, for the user's GPS.</li>
- *   <li>{@link #sternIcMarker()} — top-down pinball-machine silhouette (red backbox,
- *       blue playfield with pop bumpers + silver ball + yellow flippers) for venues
- *       returned by Stern's native v2 endpoint.</li>
- *   <li>{@link #sternArmyMarker()} — gold/yellow pinball machine with a white star
- *       on the backbox, for venues from {@code sternpinball.com/stern-army-locator/}
- *       (Pinball Map filtered to {@code is_stern_army=true}).</li>
+ *   <li>{@link #sternIcMarker()} — stick figure playing pinball, in the original
+ *       artwork colours (dark green tile, yellow/orange machine, white figure)
+ *       for venues from Stern's native v2 endpoint.</li>
+ *   <li>{@link #sternArmyMarker()} — same artwork in USA colours (navy tile,
+ *       red machine, white figure) for Stern Army and crossover (both Stern IC
+ *       AND Stern Army) venues.</li>
  * </ul>
- * All icons use anchor at horizontal-centre / vertical-bottom so the visual point
- * sits on the geographic coordinate.
+ * Anchored bottom-centre so the visual tile sits on the geographic coordinate.
  */
 public final class MapIcons {
 
@@ -32,54 +31,65 @@ public final class MapIcons {
             + "</svg>";
 
     /**
-     * Top-down pinball-machine silhouette. Reads as a pinball table: backbox at the
-     * top with a light, rounded playfield body, three pop bumpers and a silver ball
-     * in the middle, and yellow flippers angled at the bottom.
+     * Stick figure leaning into a pinball machine. Side-on view, three flat
+     * fills (background tile, machine, figure) so the silhouette reads at
+     * map-marker scale (~32 px square). The bottom-centre anchor sits on the
+     * geographic point.
      */
-    private static String pinballMachineSvg(String cabinetFill, String backboxFill,
-                                            String bulbFill, String accentFill,
-                                            String starSvg) {
-        return "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 44' width='32' height='44'>"
-                + "<ellipse cx='16' cy='42' rx='8' ry='1.5' fill='black' opacity='0.18'/>"
-                // Backbox (head)
-                + "<rect x='8' y='2' width='16' height='7' rx='1.2' fill='" + backboxFill + "' stroke='#1a1a1a' stroke-width='1'/>"
-                // Bulb / star on the backbox
-                + (starSvg != null && !starSvg.isEmpty()
-                        ? starSvg
-                        : "<circle cx='16' cy='5.5' r='1.4' fill='" + bulbFill + "'/>")
-                // Cabinet body — slight inward taper toward the bottom, rounded at the apron
-                + "<path d='M7 9 L25 9 L26 33 Q26 38 22 38 L10 38 Q6 38 6 33 Z'"
-                + " fill='" + cabinetFill + "' stroke='#1a1a1a' stroke-width='1'/>"
-                // Pop bumpers
-                + "<circle cx='12' cy='15' r='1.6' fill='" + accentFill + "' stroke='#1a1a1a' stroke-width='0.4'/>"
-                + "<circle cx='20' cy='15' r='1.6' fill='" + accentFill + "' stroke='#1a1a1a' stroke-width='0.4'/>"
-                + "<circle cx='16' cy='20' r='1.6' fill='" + accentFill + "' stroke='#1a1a1a' stroke-width='0.4'/>"
-                // Ball (silver)
-                + "<circle cx='16' cy='27' r='1.9' fill='#eceff1' stroke='#1a1a1a' stroke-width='0.4'/>"
-                + "<circle cx='15.3' cy='26.3' r='0.55' fill='white'/>"
-                // Flippers — angled inward, meeting at the drain
-                + "<path d='M9 33 L14.5 35.5 L14.5 33.8 Z' fill='" + accentFill + "' stroke='#1a1a1a' stroke-width='0.4'/>"
-                + "<path d='M23 33 L17.5 35.5 L17.5 33.8 Z' fill='" + accentFill + "' stroke='#1a1a1a' stroke-width='0.4'/>"
+    private static String playerAtMachineSvg(String bg, String machine, String figure) {
+        return "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 36' width='32' height='36'>"
+                // soft shadow under the tile
+                + "<ellipse cx='16' cy='34.5' rx='9' ry='1.2' fill='black' opacity='0.2'/>"
+                // background tile (rounded square)
+                + "<rect x='1' y='1' width='30' height='30' rx='3.5' fill='" + bg + "'/>"
+                // machine: cabinet body
+                + "<rect x='17' y='14' width='12' height='13' fill='" + machine + "'/>"
+                // machine: backbox (rear/top section, taller than cabinet)
+                + "<rect x='18.5' y='5' width='10.5' height='10' fill='" + machine + "'/>"
+                // machine: legs (under cabinet)
+                + "<rect x='18' y='27' width='2' height='3' fill='" + machine + "'/>"
+                + "<rect x='25.5' y='27' width='2' height='3' fill='" + machine + "'/>"
+                // stick figure: head
+                + "<circle cx='8.5' cy='10.5' r='2.6' fill='" + figure + "'/>"
+                // stick figure: torso/arms leaning into the machine
+                + "<path d='M5.5 13 L15.5 17 L14 21 L4 19 Z' fill='" + figure + "'/>"
+                // stick figure: back leg
+                + "<path d='M5.5 20 L4 30 L7 30 L8.5 21 Z' fill='" + figure + "'/>"
+                // stick figure: forward leg (bent toward machine)
+                + "<path d='M10 21 L11.5 30 L14.5 30 L12.5 21 Z' fill='" + figure + "'/>"
                 + "</svg>";
     }
-
-    /** Five-point white star centred on the backbox, used for the Stern Army variant. */
-    private static final String STAR =
-            "<polygon points='16,2.8 17,5 19.3,5 17.4,6.5 18.1,8.8 16,7.4 13.9,8.8 14.6,6.5 12.7,5 15,5'"
-            + " fill='white' stroke='#1a1a1a' stroke-width='0.4'/>";
 
     public static Icon youMarker() {
         return iconFromSvg(YOU_SVG);
     }
 
+    /** Default Stern IC marker — the actual artwork (stick figure + pinball
+     *  machine) served from {@code /pin-pinball-green.png} as a Spring static
+     *  resource so all markers reference the same browser-cached URL. */
     public static Icon sternIcMarker() {
-        // Blue cabinet, red backbox, yellow accents — the classic Stern colour scheme.
-        return iconFromSvg(pinballMachineSvg("#1565c0", "#e53935", "#ffeb3b", "#ffeb3b", null));
+        return iconFromUrl("/pin-pinball-green.png");
     }
 
+    /** Stern Army marker — Uncle Sam top hat (cropped from the 3-hat source). */
     public static Icon sternArmyMarker() {
-        // Gold cabinet + black backbox with a white star — Stern Army branding palette.
-        return iconFromSvg(pinballMachineSvg("#f9a825", "#212121", "#ffeb3b", "#212121", STAR));
+        return iconFromUrl("/pin-pinball-usa.png");
+    }
+
+    /** Crossover marker (Stern IC ∩ Stern Army) — Uncle Sam hat with the
+     *  black stickman+machine silhouette composited centred on the crown. */
+    public static Icon crossoverMarker() {
+        return iconFromUrl("/pin-pinball-crossover.png");
+    }
+
+    private static Icon iconFromUrl(String url) {
+        Icon.Options opts = new Icon.Options();
+        opts.setSrc(url);
+        opts.setAnchor(new Icon.Anchor(0.5, 1.0));
+        // The source JPG is 260×260; render at ~36 px so the marker matches
+        // the SVG marker scale.
+        opts.setScale(0.14);
+        return new Icon(opts);
     }
 
     private static Icon iconFromSvg(String svg) {
