@@ -1,0 +1,16 @@
+target/
+.claude/
+node_modules/
+package-lock.json
+package.json
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+src/main/frontend/generated/
+src/main/bundles/
+.vaadin/
+vite.generated.ts
+tsconfig.json
+types.d.ts
